@@ -1,36 +1,28 @@
 #!/bin/bash
 
-set -e
-
 echo "====== Squid Proxy Auto Installer ======"
 
-# Ask for username
-read -p "Enter proxy username: " PROXY_USER
-
-# Ask for password (hidden)
-read -s -p "Enter proxy password: " PROXY_PASS
-echo ""
-read -s -p "Confirm proxy password: " PROXY_PASS2
-echo ""
-
-if [ "$PROXY_PASS" != "$PROXY_PASS2" ]; then
-    echo "❌ Passwords do not match. Exiting."
-    exit 1
-fi
-
-echo "🔄 Installing Squid..."
 apt update -y
-apt install -y squid apache2-utils ufw
+apt install squid apache2-utils ufw -y
+
+# Generate Random Username & Password
+USER="user$(shuf -i 1000-9999 -n 1)"
+PASS="$(openssl rand -base64 12)"
+
+echo "🔐 Creating Proxy User..."
 
 # Create password file
-htpasswd -bc /etc/squid/passwd "$PROXY_USER" "$PROXY_PASS"
+htpasswd -cb /etc/squid/passwd $USER $PASS
 
-# Write squid config
-cat >/etc/squid/squid.conf <<EOF
+# Backup old config
+mv /etc/squid/squid.conf /etc/squid/squid.conf.bak
+
+# Write fresh squid config
+cat > /etc/squid/squid.conf <<EOF
 http_port 3128
 
 auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/passwd
-auth_param basic realm SquidProxy
+auth_param basic realm Squid Proxy
 acl auth_users proxy_auth REQUIRED
 
 http_access allow auth_users
@@ -57,5 +49,6 @@ echo ""
 echo "✅ Squid Installed Successfully!"
 echo "--------------------------------------"
 echo "Proxy: $SERVER_IP:3128"
-echo "Username: $PROXY_USER"
+echo "Username: $USER"
+echo "Password: $PASS"
 echo "--------------------------------------"
